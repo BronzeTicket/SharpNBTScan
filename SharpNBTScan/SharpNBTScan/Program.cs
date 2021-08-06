@@ -43,47 +43,46 @@ namespace SharpNBTScan
             try
             {
                 HostInfo = NBNSResolver.NBNSParser(NameQueryResponse, NameQueryResponse.Length);
+            
+                #region identify  groupname\computername and service
+                string ComputerName = "";
+                string GroupName = "";
+                bool IsComputerName = true;
+                char chrService = '\xff';
+                string ServiceName = "";
+                for (int i = 0; i < HostInfo.header.number_of_names; i++)
+                {
+                    chrService = HostInfo.names[i].ascii_name.AsQueryable().Last();
+                    ushort flag = HostInfo.names[i].rr_flags;
+                    if (chrService == '\x00' && IsComputerName && ((flag & 0x8000) == 0))
+                    {
+                        ComputerName = new string(HostInfo.names[i].ascii_name).Replace('\0', ' ').Trim();
+                        IsComputerName = false;
+                    }
+                    else if (chrService == '\x00')
+                    {
+                        GroupName = new string(HostInfo.names[i].ascii_name).Replace('\0', ' ').Trim();
+                    }
+                    else if (chrService == '\x1C')
+                    {
+                        ServiceName = "DC";
+                    }
+
+                }
+                #endregion
+
+                #region identify device via mac
+                String Device = "";
+                Device = NBNSResolver.MACParser(HostInfo.footer.adapter_address);
+                #endregion
+
+                Console.WriteLine(String.Format("{0,-15}", address) + String.Format("{0,-30}", GroupName + '\\' + ComputerName)
+                    + String.Format("{0,-10}", ServiceName) + String.Format("{0,-15}", Device));
             }
             catch (Exception e)
             {
                 Console.WriteLine(String.Format("{0,-15}", address) + e.Message);
             }
-
-            #region identify  groupname\computername and service
-            string ComputerName = "";
-            string GroupName = "";
-            bool IsComputerName = true;
-            char chrService = '\xff';
-            string ServiceName = "";
-            for (int i = 0; i < HostInfo.header.number_of_names; i++)
-            {
-                chrService = HostInfo.names[i].ascii_name[15];
-                ushort flag = HostInfo.names[i].rr_flags;
-                if (chrService == '\x00' && IsComputerName && ((flag & 0x8000) == 0))
-                {
-                    ComputerName = new string(HostInfo.names[i].ascii_name).Replace('\0', ' ').Trim();
-                    IsComputerName = false;
-                }
-                else if (chrService == '\x00')
-                {
-                    GroupName = new string(HostInfo.names[i].ascii_name).Replace('\0', ' ').Trim();
-                }
-                else if (chrService == '\x1C')
-                {
-                    ServiceName = "DC";
-                }
-
-            }
-            #endregion
-
-            #region identify device via mac
-            String Device = "";
-            Device = NBNSResolver.MACParser(HostInfo.footer.adapter_address);
-            #endregion
-
-            Console.WriteLine(String.Format("{0,-15}", address) + String.Format("{0,-30}", GroupName + '\\' + ComputerName)
-                + String.Format("{0,-10}", ServiceName) + String.Format("{0,-15}", Device));
-
         }
 
         public static void RecieveMessage(IAsyncResult asyncResult)
